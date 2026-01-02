@@ -2,9 +2,16 @@ import discord
 from discord.ext import commands
 import threading
 import asyncio
+import os
 
-# ----- التوكنات -----
-TOKENS = 
+# ----- التوكنات (من Environment Variables) -----
+TOKENS = [
+    os.getenv("TOKEN1"),
+    os.getenv("TOKEN2"),
+    os.getenv("TOKEN3"),
+    os.getenv("TOKEN4"),
+    os.getenv("TOKEN5"),
+]
 
 # ----- الرومات الصوتية -----
 VOICE_CHANNEL_IDS = [
@@ -26,6 +33,9 @@ BASE_ALLOWED_USERS = [
 
 # ----- تشغيل بوت -----
 def start_bot(token, voice_channel_id):
+    if not token:
+        return
+
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
@@ -43,7 +53,6 @@ def start_bot(token, voice_channel_id):
     async def on_ready():
         print(f"{bot.user} جاهز ✅")
 
-    # --------- دخول ---------
     @bot.command()
     async def دخول(ctx):
         if not allowed(ctx):
@@ -53,18 +62,15 @@ def start_bot(token, voice_channel_id):
             await ctx.send("❌ البوت داخل الروم بالفعل")
             return
 
-        channel = await bot.fetch_channel(voice_channel_id)
+        channel = bot.get_channel(voice_channel_id)
+        if not channel:
+            await ctx.send("❌ الروم غير موجود")
+            return
+
         vc = await channel.connect()
-
-        # Deaf بعد الدخول
-        await vc.guild.change_voice_state(
-            channel=channel,
-            self_deaf=True
-        )
-
+        await vc.guild.change_voice_state(channel=channel, self_deaf=True)
         await ctx.send("✅ دخل الروم الصوتي (Deaf)")
 
-    # --------- خروج ---------
     @bot.command()
     async def خروج(ctx):
         if not allowed(ctx):
@@ -77,7 +83,6 @@ def start_bot(token, voice_channel_id):
         else:
             await ctx.send("❌ البوت خارج الروم")
 
-    # --------- تصريح ---------
     @bot.command()
     async def تصريح(ctx):
         if not allowed(ctx):
@@ -85,7 +90,6 @@ def start_bot(token, voice_channel_id):
         msg = "✅ المصرح لهم:\n" + "\n".join(f"<@{u}>" for u in allowed_users)
         await ctx.send(msg)
 
-    # --------- إضافة ---------
     @bot.command()
     async def أضف(ctx, user: discord.Member):
         if not allowed(ctx):
@@ -96,7 +100,6 @@ def start_bot(token, voice_channel_id):
             allowed_users.append(user.id)
             await ctx.send(f"✅ تم إضافة {user.mention}")
 
-    # --------- حذف ---------
     @bot.command()
     async def حذف(ctx, user: discord.Member):
         if not allowed(ctx):
@@ -107,7 +110,6 @@ def start_bot(token, voice_channel_id):
             allowed_users.remove(user.id)
             await ctx.send(f"✅ تم حذف {user.mention}")
 
-    # --------- ساعد ---------
     @bot.command()
     async def ساعد(ctx):
         if not allowed(ctx):
@@ -121,11 +123,17 @@ def start_bot(token, voice_channel_id):
 
 
 # ----- تشغيل كل البوتات -----
+threads = []
+
 for token, channel_id in zip(TOKENS, VOICE_CHANNEL_IDS):
-    threading.Thread(
+    t = threading.Thread(
         target=start_bot,
         args=(token, channel_id),
         daemon=True
-    ).start()
+    )
+    t.start()
+    threads.append(t)
 
-input("اضغط Enter للإغلاق...")
+# يمنع السكربت من الإغلاق (بدل input)
+for t in threads:
+    t.join()
